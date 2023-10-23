@@ -1,3 +1,9 @@
+# 修复负数能耗
+添加了 `begin_long` 和 `end_long`。
+每隔5分钟检查能耗是否溢出，如果发现溢出，则进行修正。
+不适用于秒级的统计区间。
+
+
 # PyRAPL
 
 [![License: MIT](https://img.shields.io/pypi/l/pyRAPL)](https://spdx.org/licenses/MIT.html)

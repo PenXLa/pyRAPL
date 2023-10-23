@@ -19,10 +19,12 @@
 # SOFTWARE.
 import functools
 
-from time import time_ns
+from time import time_ns, sleep
 from pyRAPL import Result
 from pyRAPL.outputs import PrintOutput, Output
 import pyRAPL
+import threading
+
 
 
 def empty_energy_result(energy_result):
@@ -45,12 +47,54 @@ class Measurement:
 
     def __init__(self, label: str, output: Output = None):
         self.label = label
+        self._accumulated_energy = None
         self._energy_begin = None
         self._ts_begin = None
         self._results = None
         self._output = output if output is not None else PrintOutput()
 
         self._sensor = pyRAPL._sensor
+        self._stop_checking = False
+
+    
+    def update_energy(self):
+        max_energy = self._sensor.max_energy()
+        energy = self._sensor.energy()
+        for idx, (prev, cur, mx) in enumerate(zip(self._energy_begin, energy, max_energy)):
+            if cur < prev:
+                self._accumulated_energy[idx] += mx - prev + cur
+            else:
+                self._accumulated_energy[idx] += cur - prev
+        self._energy_begin = energy
+        
+
+    def check_overflow(self):
+        while not self._stop_checking:
+            self.update_energy()
+            sleep(300)
+
+
+    def begin_long(self):
+        self._energy_begin = self._sensor.energy()
+        self._accumulated_energy = [0] * len(self._energy_begin)
+        self._ts_begin = time_ns()
+        self._stop_checking = False
+        threading.Thread(target=self.check_overflow).start()
+
+
+    def end_long(self):
+        self._stop_checking = True
+        self.update_energy()
+        ts_end = time_ns()
+
+        delta = self._accumulated_energy
+        duration = ts_end - self._ts_begin
+        pkg = delta[0::2]  # get odd numbers
+        pkg = pkg if empty_energy_result(pkg) else None  # set result to None if its contains only -1
+        dram = delta[1::2]  # get even numbers
+        dram = dram if empty_energy_result(dram) else None  # set result to None if its contains only -1
+
+        self._results = Result(self.label, self._ts_begin / 1000000000, duration / 1000, pkg, dram)
 
     def begin(self):
         """

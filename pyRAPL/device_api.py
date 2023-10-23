@@ -76,7 +76,7 @@ class DeviceAPI:
 
         self._socket_ids.sort()
 
-        self._sys_files = self._open_rapl_files()
+        self._sys_files, self._sys_files_max = self._open_rapl_files() # 后一个是数值上限
 
     def _open_rapl_files(self):
         raise NotImplementedError()
@@ -130,6 +130,14 @@ class DeviceAPI:
             result[self._socket_ids[i]] = float(device_file.readline())
         return tuple(result)
 
+    def max_energy(self) -> Tuple[float, ...]:
+        result = [-1] * (self._socket_ids[-1] + 1)
+        for i in range(len(self._sys_files_max)):
+            device_file = self._sys_files_max[i]
+            device_file.seek(0, 0)
+            result[self._socket_ids[i]] = float(device_file.readline())
+        return tuple(result)
+
 
 class PkgAPI(DeviceAPI):
 
@@ -140,9 +148,11 @@ class PkgAPI(DeviceAPI):
         directory_name_list = self._get_socket_directory_names()
 
         rapl_files = []
+        rapl_files_max = []
         for (directory_name, _) in directory_name_list:
             rapl_files.append(open(directory_name + '/energy_uj', 'r'))
-        return rapl_files
+            rapl_files_max.append(open(directory_name + '/max_energy_range_uj', 'r'))
+        return rapl_files, rapl_files_max
 
 
 class DramAPI(DeviceAPI):
@@ -160,15 +170,18 @@ class DramAPI(DeviceAPI):
                 dirname = socket_directory_name + '/intel-rapl:' + str(rapl_socket_id) + ':' + str(rapl_device_id)
                 f_device = open(dirname + '/name', 'r')
                 if f_device.readline() == 'dram\n':
-                    return open(dirname + '/energy_uj', 'r')
+                    return open(dirname + '/energy_uj', 'r'), open(dirname + '/max_energy_range_uj', 'r')
                 rapl_device_id += 1
             raise PyRAPLCantInitDeviceAPI()
 
         rapl_files = []
+        rapl_files_max = []
         for (socket_directory_name, rapl_socket_id) in directory_name_list:
-            rapl_files.append(get_dram_file(socket_directory_name, rapl_socket_id))
+            file, file_max = get_dram_file(socket_directory_name, rapl_socket_id)
+            rapl_files.append(file)
+            rapl_files_max.append(file_max)
 
-        return rapl_files
+        return rapl_files, rapl_files_max
 
 
 class DeviceAPIFactory:

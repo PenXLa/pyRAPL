@@ -82,3 +82,12 @@ class Sensor:
             for socket_id in range(len(energy)):
                 result[socket_id * 2 + device] = energy[socket_id]
         return result
+    
+    def max_energy(self) -> SubstractableList:
+        result = SubstractableList([-1, -1] * (self._socket_ids[-1] + 1))
+        # print((result, self._socket_ids))
+        for device in self._available_devices:
+            max_energy = self._device_api[device].max_energy()
+            for socket_id in range(len(max_energy)):
+                result[socket_id * 2 + device] = max_energy[socket_id]
+        return result
