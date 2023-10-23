@@ -54,7 +54,8 @@ class Measurement:
         self._output = output if output is not None else PrintOutput()
 
         self._sensor = pyRAPL._sensor
-        self._stop_checking = False
+        self._started = False
+        threading.Thread(target=self.check_overflow).start()
 
     
     def update_energy(self):
@@ -69,21 +70,19 @@ class Measurement:
         
 
     def check_overflow(self):
-        while not self._stop_checking:
-            self.update_energy()
+        while True:
+            if self._started: self.update_energy()
             sleep(300)
-
 
     def begin_long(self):
         self._energy_begin = self._sensor.energy()
         self._accumulated_energy = [0] * len(self._energy_begin)
         self._ts_begin = time_ns()
-        self._stop_checking = False
-        threading.Thread(target=self.check_overflow).start()
+        self._started = True
 
 
     def end_long(self):
-        self._stop_checking = True
+        self._started = False
         self.update_energy()
         ts_end = time_ns()
 
